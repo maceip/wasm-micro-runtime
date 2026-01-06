@@ -15,7 +15,7 @@ NC='\033[0m'
 print_header() {
     echo -e "${BLACK_CYAN_ITALIC}═════════════════════════════════════════════════════════════${DARK_PURPLE}kontext.dev${BLACK_CYAN_ITALIC}═${NC}"
     echo -e "${BLACK_CYAN_ITALIC}$1${NC}"
-    echo -e "${BLACK_CYAN_ITALIC}══════════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${BLACK_CYAN_ITALIC}═════════════════════════════════════════════════════════════════════════${NC}"
 }
 
 # Function to print status
