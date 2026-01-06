@@ -11,13 +11,13 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 ITALIC='\033[3m'
 BG_BLACK='\033[40m'
-DARK_PURPLE='\033[38;5;53m'
+PINK='\033[38;5;213m'
 NC='\033[0m' # no color
 
 # header styling
 HEADER_LINE="${BG_BLACK}${GREEN}"
 HEADER_TEXT="${BG_BLACK}${CYAN}${ITALIC}"
-KONTEXT_DEV="${BG_BLACK}${DARK_PURPLE}"
+KONTEXT_DEV="${BG_BLACK}${PINK}"
 
 echo_info() {
     echo -e "${GREEN}[info]${NC} $1"
