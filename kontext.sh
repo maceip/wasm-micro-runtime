@@ -377,16 +377,37 @@ if [ -z "$ALLOW_ROOT" ] || [ "$ALLOW_ROOT" != "1" ]; then
 
         if [ "$RUN_EXAMPLE" = "y" ] || [ "$RUN_EXAMPLE" = "Y" ]; then
             echo ""
-            print_header "mcp server demo"
+            print_header "mcp url elicitation demo"
             echo ""
-            echo_info "testing hello.wasm mcp server..."
+
+            # Check if Python 3 is available
+            if ! command -v python3 &> /dev/null; then
+                echo_warn "python3 not found, falling back to basic demo"
+                echo_info "testing hello.wasm mcp server..."
+                echo ""
+                echo "sending initialize request..."
+                (echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"kontext-demo","version":"1.0.0"}},"id":1}'; sleep 1) | timeout 3 $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm 2>&1 | grep -E '^\{' | head -5
+                echo ""
+                echo_info "mcp server responded with json-rpc!"
+            else
+                echo_info "running mcp client with url elicitation capability..."
+                echo ""
+
+                # Check if MCP client demo exists
+                if [ -f "$PROJECT_ROOT/mcp-client-demo.py" ]; then
+                    echo "demonstrating url elicitation with oauth server..."
+                    echo ""
+                    timeout 10 python3 "$PROJECT_ROOT/mcp-client-demo.py" "$OAUTH_DIR/oauth_prod" 2>&1 || true
+                else
+                    echo_info "basic json-rpc test (install python3 for full demo)..."
+                    (echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{"elicitation":{"url":{}}},"clientInfo":{"name":"kontext-demo","version":"1.0.0"}},"id":1}'; sleep 1) | timeout 3 $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm 2>&1 | grep -E '^\{' | head -5
+                fi
+                echo ""
+                echo_info "url elicitation demo complete!"
+            fi
+
             echo ""
-            echo "sending initialize request..."
-            (echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"kontext-demo","version":"1.0.0"}},"id":1}'; sleep 1) | timeout 3 $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm 2>&1 | grep -E '^\{' | head -5
-            echo ""
-            echo_info "mcp server responded with json-rpc!"
-            echo ""
-            echo "to test oauth with browser, run:"
+            echo "to manually test oauth with browser:"
             echo "  cd $OAUTH_DIR && ./oauth_prod"
             echo ""
         fi
