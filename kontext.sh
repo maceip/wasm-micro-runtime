@@ -33,7 +33,7 @@ echo_error() {
 
 print_header() {
     local title="$1"
-    echo -e "${HEADER_LINE}═════════════════════════════════════════════════════════════${KONTEXT_DEV}kontext.dev${HEADER_LINE}═${NC}"
+    echo -e "${HEADER_LINE}══════════════════════════════════════════════════════════${KONTEXT_DEV}kontext.dev${HEADER_LINE}═${NC}"
     echo -e "${HEADER_TEXT}${title}${NC}"
     echo -e "${HEADER_LINE}══════════════════════════════════════════════════════════════════════${NC}"
 }
