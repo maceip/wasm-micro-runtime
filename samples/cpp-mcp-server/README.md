@@ -11,6 +11,8 @@ The MCP Server for WAMR exposes WebAssembly runtime capabilities through MCP too
 - Listing loaded modules
 - Querying WAMR version and configuration
 - **OAuth 2.1 authentication with PKCE** for secure access control
+- **Tasks (SEP-1686)** for long-running asynchronous operations
+- **URL Elicitation** for secure OAuth and credential flows
 
 ## Architecture
 
@@ -53,9 +55,10 @@ cmake ..
 make
 ```
 
-Two executables will be created in the build directory:
+Three executables will be created in the build directory:
 - `cpp-mcp-server` - Basic MCP server without authentication
 - `cpp-mcp-server-oauth` - MCP server with OAuth 2.1 authentication
+- `cpp-mcp-server-tasks` - MCP server with Tasks and URL Elicitation (MCP 2025-11-25 spec)
 
 ## Running
 
@@ -75,7 +78,15 @@ Start the OAuth-enabled server:
 ./build/cpp-mcp-server-oauth
 ```
 
-Both servers will start on `localhost:8888` by default.
+### Tasks & Elicitation Server (MCP 2025-11-25)
+
+Start the server with Tasks and URL Elicitation support:
+
+```bash
+./build/cpp-mcp-server-tasks
+```
+
+All servers start on `localhost:8888` by default.
 
 ## Available MCP Tools
 
@@ -375,6 +386,105 @@ OAuth configuration in `src/main_oauth.cpp`:
 - `issuer`: OAuth issuer URL (default: "http://localhost:8888")
 - `audience`: Resource audience (default: "wamr-mcp-server")
 - Token expiration: 1 hour (configurable in `oauth_handler.h`)
+
+## MCP Tasks and URL Elicitation (2025-11-25 Spec)
+
+The `cpp-mcp-server-tasks` executable implements the latest MCP specification features for production-ready asynchronous workflows.
+
+### Tasks (SEP-1686)
+
+Tasks enable "call-now, fetch-later" execution for long-running operations:
+
+**Features:**
+- Asynchronous task creation with immediate task ID return
+- Status polling while task executes
+- Result retrieval when complete
+- Task cancellation support
+- Automatic cleanup with configurable TTL
+- Session-based security isolation
+
+**Task Lifecycle States:**
+- `working` - Task in progress
+- `input_required` - Needs user input
+- `completed` - Successfully finished
+- `failed` - Error occurred
+- `cancelled` - Stopped by user
+
+**Available Task Tools:**
+- `load_wasm_task` - Load WASM module asynchronously
+- `tasks/get` - Query task status
+- `tasks/result` - Get task result (blocks until complete)
+- `tasks/list` - List all session tasks with pagination
+- `tasks/cancel` - Cancel running task
+
+**Example Workflow:**
+```json
+// 1. Create task
+{"method": "tools/call", "params": {"name": "load_wasm_task", "arguments": {"module_name": "app", "file_path": "/path/to/app.wasm"}}}
+// Returns: {"task": {"taskId": "task_1", "status": "working", ...}}
+
+// 2. Poll status
+{"method": "tools/call", "params": {"name": "tasks/get", "arguments": {"taskId": "task_1"}}}
+
+// 3. Get result
+{"method": "tools/call", "params": {"name": "tasks/result", "arguments": {"taskId": "task_1"}}}
+```
+
+### URL Elicitation
+
+Enables secure out-of-band user interactions for OAuth and credential flows:
+
+**Features:**
+- **URL Mode**: Sensitive operations (OAuth, payments) that bypass MCP client
+- **Form Mode**: In-band structured data collection with JSON Schema
+- **Security**: Data never exposed to MCP client in URL mode
+- **Compliance**: Supports PCI-DSS for payment processing
+
+**Use Cases:**
+- OAuth authorization flows
+- Payment processing
+- Third-party API authorization
+- Credential collection
+
+**Available Elicitation Tools:**
+- `elicitation/create_url` - Create URL mode elicitation
+- `elicitation/create_form` - Create form mode elicitation
+- `elicitation/complete` - Mark elicitation as complete
+
+**Example OAuth Flow:**
+```json
+// 1. Create URL elicitation
+{
+  "method": "tools/call",
+  "params": {
+    "name": "elicitation/create_url",
+    "arguments": {
+      "message": "Authorize GitHub access",
+      "url": "https://github.com/login/oauth/authorize?client_id=xxx"
+    }
+  }
+}
+
+// 2. Client shows URL to user (must display full URL and domain)
+// 3. User completes OAuth in browser
+// 4. Server marks complete
+{
+  "method": "tools/call",
+  "params": {
+    "name": "elicitation/complete",
+    "arguments": {"elicitationId": "550e8400-..."}
+  }
+}
+```
+
+### Detailed Documentation
+
+See [MCP_TASKS_ELICITATION.md](MCP_TASKS_ELICITATION.md) for comprehensive documentation including:
+- Complete API reference
+- Security best practices
+- Workflow examples
+- Error handling
+- Production deployment guide
 
 ## Dependencies
 

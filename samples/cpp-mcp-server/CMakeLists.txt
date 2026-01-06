@@ -118,17 +118,26 @@ add_executable (cpp-mcp-server-oauth
     ${UNCOMMON_SHARED_SOURCE}
 )
 
-# Include OAuth handler header directory
+add_executable (cpp-mcp-server-tasks
+    src/main_tasks.cpp
+    ${UNCOMMON_SHARED_SOURCE}
+)
+
+# Include header directories for task and elicitation support
 target_include_directories(cpp-mcp-server-oauth PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
+target_include_directories(cpp-mcp-server-tasks PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
 
 check_pie_supported()
 set_target_properties (cpp-mcp-server PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set_target_properties (cpp-mcp-server-oauth PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties (cpp-mcp-server-tasks PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if (APPLE)
   target_link_libraries (cpp-mcp-server vmlib mcp -lm -ldl -lpthread)
   target_link_libraries (cpp-mcp-server-oauth vmlib mcp -lm -ldl -lpthread)
+  target_link_libraries (cpp-mcp-server-tasks vmlib mcp -lm -ldl -lpthread)
 else ()
   target_link_libraries (cpp-mcp-server vmlib mcp -lm -ldl -lpthread -lrt)
   target_link_libraries (cpp-mcp-server-oauth vmlib mcp -lm -ldl -lpthread -lrt)
+  target_link_libraries (cpp-mcp-server-tasks vmlib mcp -lm -ldl -lpthread -lrt)
 endif ()
