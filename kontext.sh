@@ -2,68 +2,77 @@
 
 set -e  # Exit on error
 
-echo "=========================================="
-echo "WAMR MCP Server Build Script"
-echo "Ubuntu 20.04 Setup and Build"
-echo "=========================================="
-
-# Colors for output
+# ANSI color codes
+BLACK_GREEN='\033[40;32m'
+BLACK_CYAN_ITALIC='\033[40;36;3m'
+BLACK_RED='\033[40;31m'
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m'
+
+# Function to print headers
+print_header() {
+    echo -e "${BLACK_CYAN_ITALIC}═══════════════════════════════════════${NC}"
+    echo -e "${BLACK_CYAN_ITALIC}       ${BLACK_RED}kontext.dev${BLACK_CYAN_ITALIC}       ${NC}"
+    echo -e "${BLACK_CYAN_ITALIC}       $1${NC}"
+    echo -e "${BLACK_CYAN_ITALIC}═══════════════════════════════════════${NC}"
+}
 
 # Function to print status
 print_status() {
-    echo -e "${BLUE}[*]${NC} $1"
+    echo -e "${CYAN}$1${NC}"
 }
 
 print_success() {
-    echo -e "${GREEN}[✓]${NC} $1"
+    echo -e "${BLACK_GREEN}$1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}[✗]${NC} $1"
+    echo -e "${RED}$1${NC}"
 }
 
+# Initial header
+print_header "wamr mcp server build script"
+echo ""
+
 # Update package lists
-print_status "Updating package lists..."
-sudo apt-get update
+print_status "updating package lists..."
+sudo apt-get update > /dev/null 2>&1
 
 # Install dependencies
-print_status "Installing build dependencies..."
+print_status "installing build dependencies..."
 sudo apt-get install -y \
     build-essential \
     cmake \
     git \
     libssl-dev \
     pkg-config \
-    wget
+    wget > /dev/null 2>&1
 
-print_success "Dependencies installed"
+print_success "dependencies installed"
 
 # Get the script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
 # Build WAMR MCP Server
-print_status "Building WAMR MCP Server samples..."
+print_status "building wamr mcp server samples..."
 
 BUILD_DIR="$SCRIPT_DIR/samples/cpp-mcp-server/build"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
-print_status "Running CMake configuration..."
-cmake .. \
-    -DCMAKE_BUILD_TYPE=Release
+print_status "running cmake configuration..."
+cmake .. -DCMAKE_BUILD_TYPE=Release > /dev/null 2>&1
 
-print_status "Compiling (this may take a few minutes)..."
-make -j$(nproc)
+print_status "compiling (this may take a few minutes)..."
+make -j$(nproc) > /dev/null 2>&1
 
-print_success "Build completed successfully!"
+print_success "build completed successfully"
 
 # Check which executables were built
-print_status "Checking built executables..."
+print_status "checking built executables..."
 if [ -f "cpp-mcp-server" ]; then
     print_success "cpp-mcp-server built successfully"
     CPP_MCP_SERVER="$BUILD_DIR/cpp-mcp-server"
@@ -80,19 +89,15 @@ if [ -f "cpp-mcp-server-tasks" ]; then
 fi
 
 echo ""
-echo "=========================================="
-echo "Build Summary"
-echo "=========================================="
+print_header "build summary"
 ls -lh cpp-mcp-server* 2>/dev/null || true
 
 echo ""
-echo "=========================================="
-echo "Testing MCP Servers"
-echo "=========================================="
+print_header "testing mcp servers"
 echo ""
 
 # Create a simple test WASM file
-print_status "Creating test WASM module..."
+print_status "creating test wasm module..."
 TEST_WASM="$BUILD_DIR/test.wasm"
 cat > /tmp/test.wat << 'EOF'
 (module
@@ -105,29 +110,27 @@ EOF
 
 # Convert WAT to WASM (if wat2wasm is available, otherwise use prebuilt)
 if command -v wat2wasm &> /dev/null; then
-    wat2wasm /tmp/test.wat -o "$TEST_WASM"
+    wat2wasm /tmp/test.wat -o "$TEST_WASM" > /dev/null 2>&1
 else
     # Create minimal WASM binary directly (add function)
     printf '\x00asm\x01\x00\x00\x00\x01\x07\x01\x60\x02\x7f\x7f\x01\x7f\x03\x02\x01\x00\x07\x07\x01\x03add\x00\x00\x0a\x09\x01\x07\x00\x20\x00\x20\x01\x6a\x0b' > "$TEST_WASM"
 fi
-print_success "Test WASM created: $TEST_WASM"
+print_success "test wasm created: $TEST_WASM"
 
 echo ""
-print_status "=========================================="
-print_status "TEST 1: Basic MCP Server"
-print_status "=========================================="
+print_status "testing basic mcp server..."
 
 if [ -f "$CPP_MCP_SERVER" ]; then
-    print_status "Starting cpp-mcp-server on port 8888..."
+    print_status "starting cpp-mcp-server on port 8888..."
     "$CPP_MCP_SERVER" > /tmp/mcp-server.log 2>&1 &
     SERVER_PID=$!
     sleep 2
 
     if kill -0 $SERVER_PID 2>/dev/null; then
-        print_success "Server started with PID $SERVER_PID"
+        print_success "server started with pid $SERVER_PID"
 
         # Test 1: List tools using nc
-        print_status "Sending tools/list request..."
+        print_status "sending tools/list request..."
         if command -v nc &> /dev/null; then
             echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | nc localhost 8888 2>/dev/null | head -20
         elif command -v curl &> /dev/null; then
@@ -135,61 +138,57 @@ if [ -f "$CPP_MCP_SERVER" ]; then
                 -H "Content-Type: application/json" \
                 -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' 2>/dev/null | head -20
         else
-            print_error "Neither nc nor curl available for testing"
+            print_error "neither nc nor curl available for testing"
         fi
         echo ""
 
         # Test 2: Get WAMR info
-        print_status "Getting WAMR info..."
+        print_status "getting wamr info..."
         if command -v nc &> /dev/null; then
             echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"wamr_info","arguments":{}}}' | nc localhost 8888 2>/dev/null | head -20
         fi
         echo ""
 
-        print_success "Stopping server..."
+        print_success "stopping server..."
         kill $SERVER_PID 2>/dev/null
         wait $SERVER_PID 2>/dev/null
-        print_success "cpp-mcp-server tests completed!"
+        print_success "cpp-mcp-server tests completed"
     else
-        print_error "Server failed to start"
+        print_error "server failed to start"
     fi
 else
-    print_error "cpp-mcp-server executable not found!"
+    print_error "cpp-mcp-server executable not found"
 fi
 
 echo ""
-print_status "=========================================="
-print_status "Server Executables Available"
-print_status "=========================================="
+print_header "server executables available"
 
-print_success "All MCP servers built successfully!"
+print_success "all mcp servers built successfully"
 echo ""
-print_status "Available servers:"
+print_status "available servers:"
 if [ -f "$CPP_MCP_SERVER" ]; then
-    echo "  [✓] cpp-mcp-server          - Basic WAMR tools"
-    echo "      Start: $CPP_MCP_SERVER"
+    echo "  cpp-mcp-server          - basic wamr tools"
+    echo "      start: $CPP_MCP_SERVER"
 fi
 if [ -f "$CPP_MCP_SERVER_OAUTH" ]; then
-    echo "  [✓] cpp-mcp-server-oauth    - OAuth 2.1 + PKCE authentication"
-    echo "      Start: $CPP_MCP_SERVER_OAUTH"
+    echo "  cpp-mcp-server-oauth    - oauth 2.1 + pkce authentication"
+    echo "      start: $CPP_MCP_SERVER_OAUTH"
 fi
 if [ -f "$CPP_MCP_SERVER_TASKS" ]; then
-    echo "  [✓] cpp-mcp-server-tasks    - Async tasks + URL elicitation"
-    echo "      Start: $CPP_MCP_SERVER_TASKS"
+    echo "  cpp-mcp-server-tasks    - async tasks + url elicitation"
+    echo "      start: $CPP_MCP_SERVER_TASKS"
 fi
 
 echo ""
-print_status "Connection info:"
-echo "  Host: localhost"
-echo "  Port: 8888 (basic), 8889 (oauth), 8890 (tasks)"
+print_status "connection info:"
+echo "  host: localhost"
+echo "  port: 8888 (basic), 8889 (oauth), 8890 (tasks)"
 
 echo ""
-echo "=========================================="
-echo "Build and Test Complete!"
-echo "=========================================="
-print_success "All three MCP servers are ready to use!"
+print_header "build and test complete"
+print_success "all three mcp servers are ready to use"
 echo ""
-print_status "Quick start:"
-echo "  1. Start a server: $CPP_MCP_SERVER"
-echo "  2. Connect from your MCP client or use nc/curl"
-echo "  3. See samples/cpp-mcp-server/README.md for examples"
+print_status "quick start:"
+echo "  1. start a server: $CPP_MCP_SERVER"
+echo "  2. connect from your mcp client or use nc/curl"
+echo "  3. see samples/cpp-mcp-server/readme.md for examples"
