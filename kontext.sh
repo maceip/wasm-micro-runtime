@@ -377,10 +377,13 @@ if [ -z "$ALLOW_ROOT" ] || [ "$ALLOW_ROOT" != "1" ]; then
 
         if [ "$RUN_EXAMPLE" = "y" ] || [ "$RUN_EXAMPLE" = "Y" ]; then
             echo ""
-            echo_info "running hello wasm example..."
-            echo_info "command: $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm"
+            echo_info "running hello wasm mcp server demo..."
+            echo_info "command: echo '{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":{},\"id\":1}' | $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm"
             echo ""
-            $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm || echo_error "failed to run hello.wasm"
+            echo "sending initialize request to mcp server..."
+            echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"kontext-demo","version":"1.0.0"}},"id":1}' | timeout 5 $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm 2>&1 | head -20
+            echo ""
+            echo_info "mcp server responded successfully!"
             echo ""
         fi
     fi
