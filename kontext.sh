@@ -195,13 +195,36 @@ if [ ! -f "$OAUTH_DIR/main.go" ]; then
     echo_info "Creating OAuth URL elicitation example..."
     mkdir -p "$OAUTH_DIR"
 
-    # Copy from our implementation if it exists
-    if [ -f "$PROJECT_ROOT/../go-sdk/examples/server/oauth-url-elicitation/main.go" ]; then
-        cp "$PROJECT_ROOT/../go-sdk/examples/server/oauth-url-elicitation/main.go" "$OAUTH_DIR/"
-        echo_info "✓ Copied OAuth implementation"
-    else
-        echo_error "OAuth source code not found"
+    # Try multiple source locations for OAuth implementation
+    OAUTH_SOURCES=(
+        "$PROJECT_ROOT/oauth-source/main.go"
+        "/home/user/go-sdk/examples/server/oauth-url-elicitation/main.go"
+        "$PROJECT_ROOT/../go-sdk/examples/server/oauth-url-elicitation/main.go"
+        "$HOME/go-sdk/examples/server/oauth-url-elicitation/main.go"
+    )
+
+    FOUND=0
+    for SOURCE in "${OAUTH_SOURCES[@]}"; do
+        if [ -f "$SOURCE" ]; then
+            echo_info "Found OAuth implementation at $SOURCE"
+            cp "$SOURCE" "$OAUTH_DIR/"
+            if [ -f "$(dirname $SOURCE)/README.md" ]; then
+                cp "$(dirname $SOURCE)/README.md" "$OAUTH_DIR/"
+            fi
+            echo_info "✓ Copied OAuth implementation"
+            FOUND=1
+            break
+        fi
+    done
+
+    if [ $FOUND -eq 0 ]; then
+        echo_error "OAuth source code not found in any expected location"
+        echo_info "Checked locations:"
+        for SOURCE in "${OAUTH_SOURCES[@]}"; do
+            echo_info "  - $SOURCE"
+        done
         echo_info "Please ensure the production OAuth implementation exists"
+        echo_info "You may need to manually copy it to: $OAUTH_DIR/main.go"
         exit 1
     fi
 fi
