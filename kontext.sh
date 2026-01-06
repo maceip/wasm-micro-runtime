@@ -369,16 +369,19 @@ echo ""
 
 # ask user if they want to run examples
 if [ -z "$ALLOW_ROOT" ] || [ "$ALLOW_ROOT" != "1" ]; then
-    echo ""
-    echo_info "would you like to run the hello wasm example now? (y/n)"
-    read -r -t 10 RUN_EXAMPLE || RUN_EXAMPLE="n"
+    # check if running interactively
+    if [ -t 0 ]; then
+        echo ""
+        echo_info "would you like to run the hello wasm example now? (y/n)"
+        read -r RUN_EXAMPLE
 
-    if [ "$RUN_EXAMPLE" = "y" ] || [ "$RUN_EXAMPLE" = "Y" ]; then
-        echo ""
-        echo_info "running hello wasm example..."
-        echo_info "command: $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm"
-        echo ""
-        $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm || echo_error "failed to run hello.wasm"
-        echo ""
+        if [ "$RUN_EXAMPLE" = "y" ] || [ "$RUN_EXAMPLE" = "Y" ]; then
+            echo ""
+            echo_info "running hello wasm example..."
+            echo_info "command: $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm"
+            echo ""
+            $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm || echo_error "failed to run hello.wasm"
+            echo ""
+        fi
     fi
 fi
