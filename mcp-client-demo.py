@@ -10,9 +10,15 @@ import webbrowser
 from typing import Optional
 
 class MCPClient:
-    def __init__(self, server_command: list[str]):
+    def __init__(self, server_command: str):
+        # Handle command as string or list
+        if isinstance(server_command, str):
+            cmd = server_command.split()
+        else:
+            cmd = server_command
+
         self.server = subprocess.Popen(
-            server_command,
+            cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -130,9 +136,11 @@ def demo_oauth_elicitation(oauth_binary: str):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python3 mcp-client-demo.py <path-to-mcp-server>")
+        print("Usage: python3 mcp-client-demo.py <server-command> [args...]")
         print("Example: python3 mcp-client-demo.py ./oauth_prod")
+        print("Example: python3 mcp-client-demo.py iwasm hello.wasm")
         sys.exit(1)
 
-    server_path = sys.argv[1]
-    demo_oauth_elicitation(server_path)
+    # Join all arguments to form the server command
+    server_command = " ".join(sys.argv[1:])
+    demo_oauth_elicitation(server_command)

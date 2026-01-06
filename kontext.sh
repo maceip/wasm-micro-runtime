@@ -395,11 +395,17 @@ if [ -z "$ALLOW_ROOT" ] || [ "$ALLOW_ROOT" != "1" ]; then
 
                 # Check if MCP client demo exists
                 if [ -f "$PROJECT_ROOT/mcp-client-demo.py" ]; then
-                    echo "demonstrating url elicitation with oauth server..."
+                    echo "demonstrating mcp url elicitation capability with hello.wasm..."
                     echo ""
-                    timeout 10 python3 "$PROJECT_ROOT/mcp-client-demo.py" "$OAUTH_DIR/oauth_prod" 2>&1 || true
+                    echo "starting mcp server with url elicitation client..."
+                    timeout 10 python3 "$PROJECT_ROOT/mcp-client-demo.py" "$IWASM_BUILD_DIR/iwasm" "$HELLO_DIR/hello.wasm" 2>&1 || true
+                    echo ""
+                    echo "note: oauth server requires credentials to be set:"
+                    echo "  export OAUTH_CLIENT_ID='your-id'"
+                    echo "  export OAUTH_AUTH_URL='https://accounts.google.com/o/oauth2/v2/auth'"
+                    echo "  python3 $PROJECT_ROOT/mcp-client-demo.py $OAUTH_DIR/oauth_prod"
                 else
-                    echo_info "basic json-rpc test (install python3 for full demo)..."
+                    echo_info "basic json-rpc test..."
                     (echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{"elicitation":{"url":{}}},"clientInfo":{"name":"kontext-demo","version":"1.0.0"}},"id":1}'; sleep 1) | timeout 3 $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm 2>&1 | grep -E '^\{' | head -5
                 fi
                 echo ""
