@@ -39,7 +39,7 @@ print_header() {
 }
 
 echo ""
-print_header "mcp oauth on wasm - complete build script | ubuntu 20.04 setup"
+print_header "go/wasm mcp url elicitation demo - complete build script | ubuntu 20.04 setup"
 echo ""
 
 # check if running as root
@@ -377,7 +377,7 @@ if [ -z "$ALLOW_ROOT" ] || [ "$ALLOW_ROOT" != "1" ]; then
 
         if [ "$RUN_EXAMPLE" = "y" ] || [ "$RUN_EXAMPLE" = "Y" ]; then
             echo ""
-            print_header "mcp url elicitation demo"
+            print_header "go/wasm mcp url elicitation demo"
             echo ""
 
             # Check if Python 3 is available
