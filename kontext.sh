@@ -341,13 +341,32 @@ echo "  $PROJECT_ROOT/QUICK_START.md"
 echo ""
 
 echo "════════════════════════════════════════════════════════════"
+echo " Binary Sizes"
+echo "════════════════════════════════════════════════════════════"
+echo ""
+if [ -f "$OAUTH_DIR/oauth_prod" ]; then
+    OAUTH_SIZE_FINAL=$(du -h "$OAUTH_DIR/oauth_prod" 2>/dev/null | cut -f1)
+    echo "OAuth Binary:   $OAUTH_SIZE_FINAL  ($OAUTH_DIR/oauth_prod)"
+fi
+if [ -f "$HELLO_DIR/hello.wasm" ]; then
+    HELLO_SIZE_FINAL=$(du -h "$HELLO_DIR/hello.wasm" 2>/dev/null | cut -f1)
+    echo "Hello WASM:     $HELLO_SIZE_FINAL  ($HELLO_DIR/hello.wasm)"
+fi
+if [ -f "$IWASM_BUILD_DIR/iwasm" ]; then
+    IWASM_SIZE_FINAL=$(du -h "$IWASM_BUILD_DIR/iwasm" 2>/dev/null | cut -f1)
+    echo "WASM Runtime:   $IWASM_SIZE_FINAL  ($IWASM_BUILD_DIR/iwasm)"
+fi
+echo ""
+
+echo "════════════════════════════════════════════════════════════"
 echo " Next Steps"
 echo "════════════════════════════════════════════════════════════"
 echo ""
 echo "1. If Go path was just installed, reload your shell:"
 echo "   source ~/.bashrc"
 echo ""
-echo "2. Set up OAuth credentials for production use"
+echo "2. Set up OAuth credentials for production use by following the guide:"
+echo "   cat $OAUTH_DIR/README.md"
 echo ""
 echo "3. Explore other MCP examples:"
 echo "   ls $GO_SDK_DIR/examples/server/"
@@ -357,3 +376,20 @@ echo "   cat $PROJECT_ROOT/QUICK_START.md"
 echo ""
 
 echo_info "Build script completed successfully! 🎉"
+echo ""
+
+# Ask user if they want to run examples
+if [ -z "$ALLOW_ROOT" ] || [ "$ALLOW_ROOT" != "1" ]; then
+    echo ""
+    echo_info "Would you like to run the Hello WASM example now? (y/n)"
+    read -r -t 10 RUN_EXAMPLE || RUN_EXAMPLE="n"
+
+    if [ "$RUN_EXAMPLE" = "y" ] || [ "$RUN_EXAMPLE" = "Y" ]; then
+        echo ""
+        echo_info "Running Hello WASM example..."
+        echo_info "Command: $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm"
+        echo ""
+        $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm || echo_error "Failed to run hello.wasm"
+        echo ""
+    fi
+fi
