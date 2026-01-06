@@ -5,7 +5,7 @@ set -e  # Exit on error
 # ANSI color codes
 BLACK_GREEN='\033[40;32m'
 BLACK_CYAN_ITALIC='\033[40;36;3m'
-BLACK_RED='\033[40;31m'
+DARK_PURPLE='\033[0;35m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 RED='\033[0;31m'
@@ -13,10 +13,9 @@ NC='\033[0m'
 
 # Function to print headers
 print_header() {
-    echo -e "${BLACK_CYAN_ITALIC}═══════════════════════════════════════${NC}"
-    echo -e "${BLACK_CYAN_ITALIC}       ${BLACK_RED}kontext.dev${BLACK_CYAN_ITALIC}       ${NC}"
-    echo -e "${BLACK_CYAN_ITALIC}       $1${NC}"
-    echo -e "${BLACK_CYAN_ITALIC}═══════════════════════════════════════${NC}"
+    echo -e "${BLACK_CYAN_ITALIC}═════════════════════════════════════════════════════════════${DARK_PURPLE}kontext.dev${BLACK_CYAN_ITALIC}═${NC}"
+    echo -e "${BLACK_CYAN_ITALIC}$1${NC}"
+    echo -e "${BLACK_CYAN_ITALIC}══════════════════════════════════════════════════════════════════════${NC}"
 }
 
 # Function to print status
