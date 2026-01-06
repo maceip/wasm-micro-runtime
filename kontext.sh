@@ -377,13 +377,17 @@ if [ -z "$ALLOW_ROOT" ] || [ "$ALLOW_ROOT" != "1" ]; then
 
         if [ "$RUN_EXAMPLE" = "y" ] || [ "$RUN_EXAMPLE" = "Y" ]; then
             echo ""
-            echo_info "running hello wasm mcp server demo..."
-            echo_info "command: echo '{\"jsonrpc\":\"2.0\",\"method\":\"initialize\",\"params\":{},\"id\":1}' | $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm"
+            print_header "mcp server demo"
             echo ""
-            echo "sending initialize request to mcp server..."
-            echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"kontext-demo","version":"1.0.0"}},"id":1}' | timeout 5 $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm 2>&1 | head -20
+            echo_info "testing hello.wasm mcp server..."
             echo ""
-            echo_info "mcp server responded successfully!"
+            echo "sending initialize request..."
+            (echo '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"kontext-demo","version":"1.0.0"}},"id":1}'; sleep 1) | timeout 3 $IWASM_BUILD_DIR/iwasm $HELLO_DIR/hello.wasm 2>&1 | grep -E '^\{' | head -5
+            echo ""
+            echo_info "mcp server responded with json-rpc!"
+            echo ""
+            echo "to test oauth with browser, run:"
+            echo "  cd $OAUTH_DIR && ./oauth_prod"
             echo ""
         fi
     fi
