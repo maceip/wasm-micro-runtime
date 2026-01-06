@@ -11,12 +11,13 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 ITALIC='\033[3m'
 BG_BLACK='\033[40m'
+DARK_PURPLE='\033[38;5;53m'
 NC='\033[0m' # no color
 
 # header styling
 HEADER_LINE="${BG_BLACK}${GREEN}"
 HEADER_TEXT="${BG_BLACK}${CYAN}${ITALIC}"
-KONTEXT_DEV="${BG_BLACK}${RED}"
+KONTEXT_DEV="${BG_BLACK}${DARK_PURPLE}"
 
 echo_info() {
     echo -e "${GREEN}[info]${NC} $1"
@@ -32,9 +33,9 @@ echo_error() {
 
 print_header() {
     local title="$1"
-    echo -e "${HEADER_LINE}═══${KONTEXT_DEV}kontext.dev${HEADER_LINE}═══${NC}"
+    echo -e "${HEADER_LINE}═════════════════════════════════════════════════════════════${KONTEXT_DEV}kontext.dev${HEADER_LINE}═${NC}"
     echo -e "${HEADER_TEXT}${title}${NC}"
-    echo -e "${HEADER_LINE}═══════════════${NC}"
+    echo -e "${HEADER_LINE}══════════════════════════════════════════════════════════════════════${NC}"
 }
 
 echo ""
