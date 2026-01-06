@@ -113,11 +113,22 @@ add_executable (cpp-mcp-server
     ${UNCOMMON_SHARED_SOURCE}
 )
 
+add_executable (cpp-mcp-server-oauth
+    src/main_oauth.cpp
+    ${UNCOMMON_SHARED_SOURCE}
+)
+
+# Include OAuth handler header directory
+target_include_directories(cpp-mcp-server-oauth PRIVATE ${CMAKE_CURRENT_LIST_DIR}/src)
+
 check_pie_supported()
 set_target_properties (cpp-mcp-server PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties (cpp-mcp-server-oauth PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if (APPLE)
   target_link_libraries (cpp-mcp-server vmlib mcp -lm -ldl -lpthread)
+  target_link_libraries (cpp-mcp-server-oauth vmlib mcp -lm -ldl -lpthread)
 else ()
   target_link_libraries (cpp-mcp-server vmlib mcp -lm -ldl -lpthread -lrt)
+  target_link_libraries (cpp-mcp-server-oauth vmlib mcp -lm -ldl -lpthread -lrt)
 endif ()
