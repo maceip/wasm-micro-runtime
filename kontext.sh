@@ -31,9 +31,16 @@ echo ""
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
-    echo_error "Please do not run this script as root"
-    echo_info "Run as a regular user. The script will use sudo when needed."
-    exit 1
+    if [ -z "$ALLOW_ROOT" ]; then
+        echo_warn "Running as root - this is not recommended for production"
+        echo_info "Set ALLOW_ROOT=1 to suppress this warning"
+        echo_info "Continuing in 3 seconds... (Ctrl+C to cancel)"
+        sleep 3
+    fi
+    # Adjust sudo usage for root user
+    SUDO_CMD=""
+else
+    SUDO_CMD="sudo"
 fi
 
 # Detect script directory
@@ -54,10 +61,10 @@ echo "════════════════════════�
 echo ""
 
 echo_info "Updating package lists..."
-sudo apt-get update
+${SUDO_CMD} apt-get update -qq
 
 echo_info "Installing build essentials..."
-sudo apt-get install -y \
+${SUDO_CMD} apt-get install -y \
     build-essential \
     cmake \
     g++-multilib \
@@ -69,7 +76,7 @@ sudo apt-get install -y \
     curl
 
 echo_info "Installing additional tools..."
-sudo apt-get install -y \
+${SUDO_CMD} apt-get install -y \
     xdg-utils \
     ca-certificates
 
@@ -98,8 +105,8 @@ else
     wget -q --show-progress "$GO_URL" -O "/tmp/$GO_TARBALL"
 
     echo_info "Extracting Go to $GO_INSTALL_DIR..."
-    sudo rm -rf "$GO_INSTALL_DIR/go"
-    sudo tar -C "$GO_INSTALL_DIR" -xzf "/tmp/$GO_TARBALL"
+    ${SUDO_CMD} rm -rf "$GO_INSTALL_DIR/go"
+    ${SUDO_CMD} tar -C "$GO_INSTALL_DIR" -xzf "/tmp/$GO_TARBALL"
     rm "/tmp/$GO_TARBALL"
 
     # Add Go to PATH
