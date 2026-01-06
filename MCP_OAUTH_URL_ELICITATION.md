@@ -24,13 +24,18 @@ URL elicitation is perfect for:
 
 ## The Example
 
-We've created a complete OAuth URL elicitation example that:
+We've created a **production-ready** OAuth URL elicitation example that:
 
-✅ Demonstrates the OAuth 2.0 authorization code flow
+✅ Implements complete OAuth 2.0 authorization code flow
+✅ Starts local HTTP server for OAuth callbacks
+✅ Opens browser automatically for user authentication
+✅ Exchanges authorization codes for real access tokens
 ✅ Uses CSRF protection with state parameter
-✅ Simulates token exchange
-✅ Compiles to WASM and runs on wasm-micro-runtime
+✅ Handles refresh tokens and token expiration
 ✅ Shows proper client capability advertisement
+✅ **Runs natively** with full OAuth support
+
+**Note**: WASM version has limitations (no HTTP server, no browser opening) due to WASI restrictions. See README for deployment options.
 
 ## Key Components
 
@@ -94,19 +99,36 @@ The example demonstrates a complete OAuth 2.0 flow:
 
 ## Building and Running
 
-### Build the WASM Binary
+### Production Binary (Native)
 
 ```bash
 cd /home/user/go-sdk/examples/server/oauth-url-elicitation
-GOOS=wasip1 GOARCH=wasm go build -o oauth_elicit.wasm main.go
+
+# Build native binary
+go build -o oauth_prod main.go
+
+# Configure OAuth provider (example: Google)
+export OAUTH_AUTH_URL="https://accounts.google.com/o/oauth2/v2/auth"
+export OAUTH_TOKEN_URL="https://oauth2.googleapis.com/token"
+export OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export OAUTH_CLIENT_SECRET="your-client-secret"
+export OAUTH_REDIRECT_URI="http://localhost:3000/oauth/callback"
+
+# Run with real OAuth
+./oauth_prod
 ```
 
-### Run on WASM Micro Runtime
+**This version works with real OAuth providers like Google, GitHub, Microsoft!**
 
-```bash
-/home/user/wasm-micro-runtime/product-mini/platforms/linux/build/iwasm \
-  oauth_elicit.wasm
-```
+### WASM Version (Limited Demo)
+
+Due to WASI limitations (no HTTP servers, no browser control), the WASM version cannot run the full OAuth flow. For production WASM deployment, consider:
+
+1. **Hybrid Architecture**: Native OAuth sidecar + WASM MCP server
+2. **Pre-authenticated**: Pass tokens to WASM via environment/stdin
+3. **Web-based**: Run in browser with JavaScript OAuth handling
+
+See the README.md for detailed deployment architectures.
 
 ### Expected Output
 
