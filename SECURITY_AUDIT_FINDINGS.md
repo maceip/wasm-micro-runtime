@@ -250,3 +250,223 @@ The `exec_env` variable is initialized to `NULL` at line 3358 and is only set af
 the checks at lines 3418-3428. Any `goto failed` before line 3428 leaves `exec_env`
 as NULL. The `failed` label code at line 3462 does not guard `exec_env` against NULL
 before using it.
+
+---
+
+## Finding 5: `call_ref` Missing `frame_per_function` Stack Frame Allocation for Import Calls
+
+**Severity:** HIGH  
+**File:** `core/iwasm/compilation/aot_emit_function.c`  
+**Lines:** 3030-3038, 3097-3145, 3230-3236
+
+### Vulnerable Code
+
+In `aot_compile_op_call_ref`, the frame allocation around the import call block:
+
+```c
+// Lines 3030-3038: Only handles !frame_per_function
+if (comp_ctx->aux_stack_frame_type
+    && !comp_ctx->call_stack_features.frame_per_function) {
+#if WASM_ENABLE_AOT_STACK_FRAME != 0
+    if (!call_aot_alloc_frame_func(comp_ctx, func_ctx, func_idx))
+        goto fail;
+#endif
+}
+
+// Lines 3097-3118: Import call block - NO frame_per_function handling
+/* Translate call import block */
+LLVMPositionBuilderAtEnd(comp_ctx->builder, block_call_import);
+// ... calls aot_invoke_native_func directly without frame alloc ...
+
+// Lines 3230-3236: Only handles !frame_per_function
+if (comp_ctx->aux_stack_frame_type
+    && !comp_ctx->call_stack_features.frame_per_function) {
+#if WASM_ENABLE_AOT_STACK_FRAME != 0
+    if (!free_frame_for_aot_func(comp_ctx, func_ctx))
+        goto fail;
+#endif
+}
+```
+
+### Description
+
+When `frame_per_function` is enabled, `aot_compile_op_call_ref` does not allocate
+or free per-function stack frames for import function calls. This is inconsistent
+with `aot_compile_op_call_indirect` (lines 2588-2592 and 2631-2635) and
+`aot_compile_op_call` (lines 1460-1467 and 1843-1848), which both correctly handle
+the `frame_per_function` case for imports.
+
+In `aot_compile_op_call_indirect`, the import call block correctly includes:
+
+```c
+// Lines 2588-2592: Allocates frame for imports when frame_per_function is true
+if (comp_ctx->aot_frame && comp_ctx->call_stack_features.frame_per_function
+    && !aot_alloc_frame_per_function_frame_for_aot_func(comp_ctx, func_ctx,
+                                                        func_idx)) {
+    goto fail;
+}
+
+// Lines 2631-2635: Frees frame for imports when frame_per_function is true
+if (comp_ctx->aot_frame && comp_ctx->call_stack_features.frame_per_function
+    && !aot_free_frame_per_function_frame_for_aot_func(comp_ctx,
+                                                       func_ctx)) {
+    goto fail;
+}
+```
+
+Neither of these blocks exists in `aot_compile_op_call_ref`.
+
+### Attack Path
+
+1. Attacker creates a WASM module with GC enabled (required for `call_ref`).
+2. The module uses `ref.func` to obtain a reference to an imported function,
+   then calls it via `call_ref`.
+3. The runtime is configured with `frame_per_function = true` and
+   `WASM_ENABLE_AOT_STACK_FRAME != 0`.
+4. The import function call executes without a dedicated stack frame being
+   allocated on the WASM operand stack.
+5. If the import function triggers a callback into WASM or causes GC, the
+   missing frame means:
+   - Stack overflow checks may not account for the import's stack usage,
+     allowing the operand stack to overflow.
+   - GC root scanning may miss references held in the calling function's
+     frame, leading to premature collection of live GC objects
+     (use-after-free in the GC heap).
+   - Stack unwinding produces incorrect call stacks, potentially confusing
+     exception handling logic.
+
+### Evidence
+
+Direct comparison of the three call-emission functions shows the omission:
+
+| Feature                        | `call` (direct) | `call_indirect` | `call_ref` |
+|-------------------------------|:---:|:---:|:---:|
+| `!frame_per_function` alloc   | ✓ (L1468-1476)  | ✓ (L2518-2526) | ✓ (L3030-3038) |
+| `!frame_per_function` free    | ✓ (L1850-1858)  | ✓ (L2722-2728) | ✓ (L3230-3236) |
+| `frame_per_function` alloc    | ✓ (L1460-1466)  | ✓ (L2588-2592) | **MISSING**     |
+| `frame_per_function` free     | ✓ (L1843-1848)  | ✓ (L2631-2635) | **MISSING**     |
+
+---
+
+## Finding 6: `get_init_expr_size` Integer Overflow in AOT File Size Calculation
+
+**Severity:** HIGH (mitigated to MEDIUM by `CHECK_BUF`)  
+**File:** `core/iwasm/compilation/aot_emit_aot_file.c`  
+**Lines:** 284-308
+
+### Vulnerable Code
+
+```c
+case INIT_EXPR_TYPE_ARRAY_NEW:
+case INIT_EXPR_TYPE_ARRAY_NEW_FIXED:
+{
+    WASMArrayNewInitValues *array_new_init_values =
+        (WASMArrayNewInitValues *)expr->u.unary.v.data;
+    WASMArrayType *array_type = NULL;
+    uint32 value_count;
+
+    // ...
+    value_count =
+        (expr->init_expr_type == INIT_EXPR_TYPE_ARRAY_NEW_FIXED)
+            ? array_new_init_values->length    // attacker-controlled
+            : 1;
+
+    /* array_elem_type + type_index + len + elems */
+    size += sizeof(uint32) * 3
+            + (uint64)wasm_value_type_size_internal(
+                  array_type->elem_type, comp_ctx->pointer_size)
+                  * value_count;              // uint64 result truncated to uint32
+    break;
+}
+```
+
+### Description
+
+The variable `size` is `uint32`. The multiplication is performed in 64-bit
+(`(uint64) * uint32`), but the result of the entire addition is implicitly
+truncated back to `uint32` when assigned via `size +=`. For
+`INIT_EXPR_TYPE_ARRAY_NEW_FIXED`, `value_count` comes from
+`array_new_init_values->length`, which is attacker-controlled via the WASM module.
+
+For example, if `elem_type` is `i64` (size 8) and `length = 0x20000001`:
+`8 * 0x20000001 = 0x100000008`, which truncates to `0x8` when stored in `uint32`.
+This causes `aot_get_aot_file_size` to return an undersized total, leading to an
+undersized heap allocation for the AOT file buffer.
+
+### Mitigation
+
+The `EMIT_*` macros used during actual buffer writing include `CHECK_BUF(length)`,
+which validates `buf + offset + length <= buf_end`. When the buffer is too small,
+the write fails gracefully before any out-of-bounds write occurs. This prevents
+memory corruption but causes a confusing compilation failure rather than a clear
+error message about the size overflow.
+
+### Attack Path
+
+1. Attacker crafts a WASM module with a global initializer using
+   `array.new_fixed` with a very large `length` value.
+2. During AOT compilation, `get_init_expr_size` computes a truncated (too-small)
+   size for the initializer expression.
+3. `aot_get_aot_file_size` returns an undersized total file size.
+4. `wasm_runtime_malloc` allocates an undersized buffer.
+5. During `aot_emit_aot_file_buf_ex`, `CHECK_BUF` detects the overflow and
+   returns `false`, preventing memory corruption.
+6. **Without `CHECK_BUF`**, this would be a heap buffer overflow. The defense
+   is fragile—any new emission code that omits `CHECK_BUF` would be exploitable.
+
+### Evidence
+
+The `size` variable is declared as `uint32` at line 215. The cast to `(uint64)`
+on line 305 only widens the multiplication operand, not the assignment target.
+C's implicit truncation on `uint32 += uint64` silently loses the high bits.
+
+---
+
+## Finding 7: `struct_get`/`struct_set` Field Access Before Bounds Check
+
+**Severity:** MEDIUM (mitigated by WASM loader validation)  
+**File:** `core/iwasm/compilation/aot_emit_gc.c`  
+**Lines:** 601-610 (`struct_get`) and 665-674 (`struct_set`)
+
+### Vulnerable Code
+
+```c
+// aot_compile_op_struct_get, lines 601-610:
+field = compile_time_struct_type->fields + field_idx;   // Use BEFORE check
+field_type = field->field_type;                          // Dereference
+field_offset = comp_ctx->pointer_size == sizeof(uint64)
+                   ? field->field_offset_64bit           // Dereference
+                   : field->field_offset_32bit;          // Dereference
+
+if (field_idx >= compile_time_struct_type->field_count) { // Check AFTER use
+    aot_set_last_error("struct field index out of bounds");
+    goto fail;
+}
+```
+
+### Description
+
+Both `aot_compile_op_struct_get` and `aot_compile_op_struct_set` compute a
+pointer into the `fields` array and dereference it (reading `field_type` and
+`field_offset`) before checking whether `field_idx` is within bounds. If
+`field_idx >= field_count`, this constitutes an out-of-bounds read from the
+`fields` array.
+
+### Mitigation
+
+The WASM loader (`wasm_loader.c`, line 14834) validates `field_idx < field_count`
+during module loading, rejecting invalid modules before AOT compilation begins.
+Therefore, the out-of-bounds access is not reachable from well-validated WASM input.
+
+### Attack Path
+
+If the AOT compiler is ever invoked on a module that bypasses the standard WASM
+loader validation (e.g., a JIT path, a fuzzing harness, or a future code path that
+skips validation), the out-of-bounds read could leak sensitive data from adjacent
+heap memory or cause a crash.
+
+### Evidence
+
+The bounds check at line 607/671 should be moved before the field access at
+line 601/665 as a defense-in-depth measure. Compare with `aot_compile_op_array_get`
+(line 1350) which correctly checks bounds before element access.
