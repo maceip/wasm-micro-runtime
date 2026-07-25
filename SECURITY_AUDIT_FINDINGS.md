@@ -253,6 +253,75 @@ before using it.
 
 ---
 
+## Finding 5: `STRING_NEW_WTF16` Insufficient Memory Bounds Check
+
+**Severity:** HIGH  
+**Files:** `core/iwasm/interpreter/wasm_interp_classic.c` (line 3408),
+`core/iwasm/interpreter/wasm_interp_fast.c` (line 2821)
+
+### Vulnerable Code (classic interpreter)
+
+```c
+case WASM_OP_STRING_NEW_UTF8:
+case WASM_OP_STRING_NEW_WTF16:
+case WASM_OP_STRING_NEW_LOSSY_UTF8:
+case WASM_OP_STRING_NEW_WTF8:
+{
+    uint32 mem_idx, addr, bytes_length, offset = 0;
+    EncodingFlag flag = WTF8;
+
+    read_leb_uint32(frame_ip, frame_ip_end, mem_idx);
+    bytes_length = POP_I32();
+    addr = POP_I32();
+
+    CHECK_MEMORY_OVERFLOW(bytes_length);  // <-- insufficient for WTF16
+
+    if (opcode == WASM_OP_STRING_NEW_WTF16) {
+        flag = WTF16;
+    }
+    // ...
+    str_obj = wasm_string_new_with_encoding(
+        maddr, bytes_length, flag);  // reads bytes_length * 2 bytes for WTF16
+```
+
+### Description
+
+The `string.new_wtf16` WebAssembly instruction takes two i32 parameters: a memory
+offset and a code unit count. Each WTF-16 code unit is 2 bytes, so the actual memory
+range accessed is `[offset, offset + codeunits * 2)`. However, the bounds check at
+line 3408 (classic) and line 2821 (fast) uses `CHECK_MEMORY_OVERFLOW(bytes_length)`
+where `bytes_length` is actually the code unit count. This validates only `codeunits`
+bytes instead of the required `codeunits * 2` bytes.
+
+The same bug exists in the AOT compiler's `aot_compile_op_string_new` function
+(`core/iwasm/compilation/aot_emit_stringref.c` line 390-391), where
+`check_bulk_memory_overflow(comp_ctx, func_ctx, offset, byte_length)` is called
+with the raw code unit count.
+
+### Attack Path
+
+1. Attacker creates a WASM module with stringref enabled.
+2. Module allocates linear memory of, say, 65536 bytes (1 page).
+3. Module calls `string.new_wtf16` with `addr = 60000` and `codeunits = 4000`.
+4. Bounds check validates: `60000 + 4000 = 64000 <= 65536` → passes.
+5. `wasm_string_new_with_encoding(maddr, 4000, WTF16)` reads `4000 * 2 = 8000`
+   bytes from `maddr`, accessing memory from offset 60000 to 68000.
+6. This reads 2464 bytes past the end of linear memory, potentially leaking
+   host process memory contents via the created string object.
+
+### Evidence
+
+For UTF-8/WTF-8 variants, `bytes_length` correctly represents byte count, so
+`CHECK_MEMORY_OVERFLOW(bytes_length)` is sufficient. But for WTF-16, the parameter
+is a code unit count (per the WebAssembly stringref specification), and each code
+unit occupies 2 bytes. Compare with the `STRINGVIEW_WTF16_ENCODE` handler (line
+3819 in classic interpreter), which correctly uses `CHECK_MEMORY_OVERFLOW(len *
+sizeof(uint16))` for the WTF-16 case (though that calculation has its own integer
+overflow issue documented in Finding 3). The fix should differentiate the WTF16
+case: `CHECK_MEMORY_OVERFLOW(opcode == WASM_OP_STRING_NEW_WTF16 ? (uint64)bytes_length * 2 : bytes_length)`.
+
+---
+
 ## Finding 5: `call_ref` Missing `frame_per_function` Stack Frame Allocation for Import Calls
 
 **Severity:** HIGH  
